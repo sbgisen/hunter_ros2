@@ -11,8 +11,12 @@ class HunterJointStatePublisher : public rclcpp::Node
 {
 public:
   HunterJointStatePublisher()
-  : Node("hunter_joint_state_publisher")
+  : Node("hunter_joint_state_publisher"),
+    first_message_(true)
   {
+    // Initialize wheel positions to zero
+    wheel_positions_.resize(4, 0.0);
+
     // Declare parameters
     this->declare_parameter("wheel_base", 0.650);  // meters
     this->declare_parameter("track_width", 0.605);  // meters
@@ -58,6 +62,17 @@ public:
 private:
   void hunterStatusCallback(const hunter_msgs::msg::HunterStatus::SharedPtr msg)
   {
+    // Calculate dt for wheel position integration
+    double dt = 0.0;
+    if (!first_message_) {
+      rclcpp::Time current_time(msg->header.stamp);
+      rclcpp::Time last_time(last_stamp_);
+      dt = (current_time - last_time).seconds();
+    } else {
+      first_message_ = false;
+    }
+    last_stamp_ = msg->header.stamp;
+
     auto joint_state_msg = sensor_msgs::msg::JointState();
     joint_state_msg.header.stamp = msg->header.stamp;
 
@@ -89,15 +104,23 @@ private:
       // MOTOR_ID_FRONT_RIGHT = 0, MOTOR_ID_FRONT_LEFT = 1
       // MOTOR_ID_REAR_RIGHT = 2, MOTOR_ID_REAR_LEFT = 3
       if (motor_id == 0) {  // Front right wheel
+        wheel_positions_[1] += velocity * dt;
+        joint_state_msg.position[1] = wheel_positions_[1];
         joint_state_msg.velocity[1] = velocity;
         joint_state_msg.effort[1] = actuator.current;
       } else if (motor_id == 1) {  // Front left wheel
+        wheel_positions_[0] += velocity * dt;
+        joint_state_msg.position[0] = wheel_positions_[0];
         joint_state_msg.velocity[0] = velocity;
         joint_state_msg.effort[0] = actuator.current;
       } else if (motor_id == 2) {  // Rear right wheel
+        wheel_positions_[3] += velocity * dt;
+        joint_state_msg.position[3] = wheel_positions_[3];
         joint_state_msg.velocity[3] = velocity;
         joint_state_msg.effort[3] = actuator.current;
       } else if (motor_id == 3) {  // Rear left wheel
+        wheel_positions_[2] += velocity * dt;
+        joint_state_msg.position[2] = wheel_positions_[2];
         joint_state_msg.velocity[2] = velocity;
         joint_state_msg.effort[2] = actuator.current;
       }
@@ -149,6 +172,11 @@ private:
   std::string rear_right_wheel_joint_;
   std::string front_left_steering_joint_;
   std::string front_right_steering_joint_;
+
+  // State tracking for wheel position integration
+  std::vector<double> wheel_positions_;  // Accumulated wheel positions [fl, fr, rl, rr]
+  builtin_interfaces::msg::Time last_stamp_;
+  bool first_message_;
 };
 
 int main(int argc, char** argv)
