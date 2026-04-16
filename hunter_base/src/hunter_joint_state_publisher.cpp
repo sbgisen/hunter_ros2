@@ -139,17 +139,8 @@ private:
 
       double R = wheel_base_ / std::tan(central_angle);
 
-      if (central_angle > 0) {  // Turning left
-        // Left wheel is inner wheel
-        joint_state_msg.position[4] = std::atan(wheel_base_ / (R - track_width_ / 2.0));
-        // Right wheel is outer wheel
-        joint_state_msg.position[5] = std::atan(wheel_base_ / (R + track_width_ / 2.0));
-      } else {  // Turning right
-        // Right wheel is inner wheel
-        joint_state_msg.position[5] = std::atan(wheel_base_ / (R + track_width_ / 2.0));
-        // Left wheel is outer wheel
-        joint_state_msg.position[4] = std::atan(wheel_base_ / (R - track_width_ / 2.0));
-      }
+      joint_state_msg.position[4] = std::atan(wheel_base_ / (R - track_width_ / 2.0));
+      joint_state_msg.position[5] = std::atan(wheel_base_ / (R + track_width_ / 2.0));
     } else {
       // Going straight
       joint_state_msg.position[4] = 0.0;
