@@ -61,6 +61,9 @@ ament_target_dependencies(hunter_joint_state_publisher rclcpp sensor_msgs hunter
 install(TARGETS hunter_base_node hunter_joint_state_publisher
   DESTINATION lib/${PROJECT_NAME})
 
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}/)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
