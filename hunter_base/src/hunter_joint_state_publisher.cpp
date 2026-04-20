@@ -70,8 +70,8 @@ void HunterJointStatePublisher::hunterStatusCallback(const hunter_msgs::msg::Hun
 
   // Initialize joint names using parameters
   joint_state_msg.name = {
-    front_left_wheel_joint_,
     front_right_wheel_joint_,
+    front_left_wheel_joint_,
     rear_left_wheel_joint_,
     rear_right_wheel_joint_,
     front_left_steering_joint_,
