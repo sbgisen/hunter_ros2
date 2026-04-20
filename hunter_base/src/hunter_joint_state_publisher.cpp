@@ -1,4 +1,5 @@
 #include "hunter_base/hunter_joint_state_publisher.hpp"
+#include "hunter_base/hunter_params.hpp"
 
 #include <cmath>
 #include <memory>
@@ -10,10 +11,6 @@ HunterJointStatePublisher::HunterJointStatePublisher()
   // Initialize wheel positions to zero
   wheel_positions_.resize(4, 0.0);
 
-  // Declare parameters
-  this->declare_parameter("wheel_base", 0.650);  // meters
-  this->declare_parameter("track_width", 0.605);  // meters
-
   // Declare joint name parameters
   this->declare_parameter("front_left_wheel_joint", "front_left_wheel");
   this->declare_parameter("front_right_wheel_joint", "front_right_wheel");
@@ -21,10 +18,6 @@ HunterJointStatePublisher::HunterJointStatePublisher()
   this->declare_parameter("rear_right_wheel_joint", "rear_right_wheel");
   this->declare_parameter("front_left_steering_joint", "front_left_steering");
   this->declare_parameter("front_right_steering_joint", "front_right_steering");
-
-  // Get parameters
-  wheel_base_ = this->get_parameter("wheel_base").as_double();
-  track_width_ = this->get_parameter("track_width").as_double();
 
   // Get joint names
   front_left_wheel_joint_ = this->get_parameter("front_left_wheel_joint").as_string();
@@ -45,7 +38,8 @@ HunterJointStatePublisher::HunterJointStatePublisher()
 
   RCLCPP_INFO(this->get_logger(), "Hunter Joint State Publisher started");
   RCLCPP_INFO(this->get_logger(), "Wheel base: %.3f m, Track width: %.3f m",
-              wheel_base_, track_width_);
+              westonrobot::HunterV2Params::wheelbase,
+              westonrobot::HunterV2Params::track);
   RCLCPP_INFO(this->get_logger(), "Joint names: [%s, %s, %s, %s, %s, %s]",
               front_left_wheel_joint_.c_str(), front_right_wheel_joint_.c_str(),
               rear_left_wheel_joint_.c_str(), rear_right_wheel_joint_.c_str(),
@@ -129,10 +123,12 @@ void HunterJointStatePublisher::hunterStatusCallback(const hunter_msgs::msg::Hun
     // For the inner wheel: tan(inner) = wheelbase / (R - track/2)
     // For the outer wheel: tan(outer) = wheelbase / (R + track/2)
 
-    double R = wheel_base_ / std::tan(central_angle);
+    constexpr double wheel_base = westonrobot::HunterV2Params::wheelbase;
+    constexpr double track_width = westonrobot::HunterV2Params::track;
+    double R = wheel_base / std::tan(central_angle);
 
-    joint_state_msg.position[4] = std::atan(wheel_base_ / (R - track_width_ / 2.0));
-    joint_state_msg.position[5] = std::atan(wheel_base_ / (R + track_width_ / 2.0));
+    joint_state_msg.position[4] = std::atan(wheel_base / (R - track_width / 2.0));
+    joint_state_msg.position[5] = std::atan(wheel_base / (R + track_width / 2.0));
   } else {
     // Going straight
     joint_state_msg.position[4] = 0.0;

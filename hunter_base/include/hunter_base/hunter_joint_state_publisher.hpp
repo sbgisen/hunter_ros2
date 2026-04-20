@@ -19,9 +19,6 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
   rclcpp::Subscription<hunter_msgs::msg::HunterStatus>::SharedPtr hunter_status_sub_;
 
-  double wheel_base_;
-  double track_width_;
-
   std::string front_left_wheel_joint_;
   std::string front_right_wheel_joint_;
   std::string rear_left_wheel_joint_;
