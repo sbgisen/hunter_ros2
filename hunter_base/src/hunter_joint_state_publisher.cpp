@@ -12,20 +12,20 @@ HunterJointStatePublisher::HunterJointStatePublisher()
   wheel_positions_.resize(4, 0.0);
 
   // Declare joint name parameters
-  this->declare_parameter("front_left_wheel_joint", "front_left_wheel");
   this->declare_parameter("front_right_wheel_joint", "front_right_wheel");
-  this->declare_parameter("rear_left_wheel_joint", "rear_left_wheel");
+  this->declare_parameter("front_left_wheel_joint", "front_left_wheel");
   this->declare_parameter("rear_right_wheel_joint", "rear_right_wheel");
-  this->declare_parameter("front_left_steering_joint", "front_left_steering");
+  this->declare_parameter("rear_left_wheel_joint", "rear_left_wheel");
   this->declare_parameter("front_right_steering_joint", "front_right_steering");
+  this->declare_parameter("front_left_steering_joint", "front_left_steering");
 
   // Get joint names
-  front_left_wheel_joint_ = this->get_parameter("front_left_wheel_joint").as_string();
   front_right_wheel_joint_ = this->get_parameter("front_right_wheel_joint").as_string();
-  rear_left_wheel_joint_ = this->get_parameter("rear_left_wheel_joint").as_string();
+  front_left_wheel_joint_ = this->get_parameter("front_left_wheel_joint").as_string();
   rear_right_wheel_joint_ = this->get_parameter("rear_right_wheel_joint").as_string();
-  front_left_steering_joint_ = this->get_parameter("front_left_steering_joint").as_string();
+  rear_left_wheel_joint_ = this->get_parameter("rear_left_wheel_joint").as_string();
   front_right_steering_joint_ = this->get_parameter("front_right_steering_joint").as_string();
+  front_left_steering_joint_ = this->get_parameter("front_left_steering_joint").as_string();
 
   // Create publisher for joint states
   joint_state_pub_ = this->create_publisher<sensor_msgs::msg::JointState>(
@@ -41,9 +41,9 @@ HunterJointStatePublisher::HunterJointStatePublisher()
               westonrobot::HunterV2Params::wheelbase,
               westonrobot::HunterV2Params::track);
   RCLCPP_INFO(this->get_logger(), "Joint names: [%s, %s, %s, %s, %s, %s]",
-              front_left_wheel_joint_.c_str(), front_right_wheel_joint_.c_str(),
-              rear_left_wheel_joint_.c_str(), rear_right_wheel_joint_.c_str(),
-              front_left_steering_joint_.c_str(), front_right_steering_joint_.c_str());
+              front_right_wheel_joint_.c_str(), front_left_wheel_joint_.c_str(),
+              rear_right_wheel_joint_.c_str(), rear_left_wheel_joint_.c_str(),
+              front_right_steering_joint_.c_str(), front_left_steering_joint_.c_str());
 }
 
 void HunterJointStatePublisher::hunterStatusCallback(const hunter_msgs::msg::HunterStatus::SharedPtr msg)
@@ -66,10 +66,10 @@ void HunterJointStatePublisher::hunterStatusCallback(const hunter_msgs::msg::Hun
   joint_state_msg.name = {
     front_right_wheel_joint_,
     front_left_wheel_joint_,
-    rear_left_wheel_joint_,
     rear_right_wheel_joint_,
+    rear_left_wheel_joint_,
+    front_right_steering_joint_,
     front_left_steering_joint_,
-    front_right_steering_joint_
   };
 
   // Initialize arrays with zeros
@@ -81,7 +81,7 @@ void HunterJointStatePublisher::hunterStatusCallback(const hunter_msgs::msg::Hun
   // The actuator_states array contains up to 3 motors
   for (size_t i = 0; i < std::min(msg->actuator_states.size(), size_t(3)); ++i) {
     const auto& actuator = msg->actuator_states[i];
-    uint8_t motor_id = actuator.motor_id;
+    uint8_t motor_id = actuator.motor_id;  // Should match the index in joint_state_msg arrays
 
     // Convert RPM to rad/s: velocity = rpm * 2π / 60
     double velocity = actuator.rpm * 2.0 * M_PI / 60.0;
@@ -89,27 +89,10 @@ void HunterJointStatePublisher::hunterStatusCallback(const hunter_msgs::msg::Hun
     // Map motor_id to joint index
     // MOTOR_ID_FRONT_RIGHT = 0, MOTOR_ID_FRONT_LEFT = 1
     // MOTOR_ID_REAR_RIGHT = 2, MOTOR_ID_REAR_LEFT = 3
-    if (motor_id == 0) {  // Front right wheel
-      wheel_positions_[1] += velocity * dt;
-      joint_state_msg.position[1] = wheel_positions_[1];
-      joint_state_msg.velocity[1] = velocity;
-      joint_state_msg.effort[1] = actuator.current;
-    } else if (motor_id == 1) {  // Front left wheel
-      wheel_positions_[0] += velocity * dt;
-      joint_state_msg.position[0] = wheel_positions_[0];
-      joint_state_msg.velocity[0] = velocity;
-      joint_state_msg.effort[0] = actuator.current;
-    } else if (motor_id == 2) {  // Rear right wheel
-      wheel_positions_[3] += velocity * dt;
-      joint_state_msg.position[3] = wheel_positions_[3];
-      joint_state_msg.velocity[3] = velocity;
-      joint_state_msg.effort[3] = actuator.current;
-    } else if (motor_id == 3) {  // Rear left wheel
-      wheel_positions_[2] += velocity * dt;
-      joint_state_msg.position[2] = wheel_positions_[2];
-      joint_state_msg.velocity[2] = velocity;
-      joint_state_msg.effort[2] = actuator.current;
-    }
+    wheel_positions_[motor_id] += velocity * dt;
+    joint_state_msg.position[motor_id] = wheel_positions_[motor_id];
+    joint_state_msg.velocity[motor_id] = velocity;
+    joint_state_msg.effort[motor_id] = actuator.current;
   }
 
   // Calculate steering angles using Ackermann geometry
@@ -127,8 +110,8 @@ void HunterJointStatePublisher::hunterStatusCallback(const hunter_msgs::msg::Hun
     constexpr double track_width = westonrobot::HunterV2Params::track;
     double R = wheel_base / std::tan(central_angle);
 
-    joint_state_msg.position[4] = std::atan(wheel_base / (R - track_width / 2.0));
-    joint_state_msg.position[5] = std::atan(wheel_base / (R + track_width / 2.0));
+    joint_state_msg.position[4] = std::atan(wheel_base / (R + track_width / 2.0));
+    joint_state_msg.position[5] = std::atan(wheel_base / (R - track_width / 2.0));
   } else {
     // Going straight
     joint_state_msg.position[4] = 0.0;
