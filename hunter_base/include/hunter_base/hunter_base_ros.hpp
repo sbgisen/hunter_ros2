@@ -39,6 +39,7 @@ class HunterBaseRos : public rclcpp::Node {
 
   bool simulated_robot_ = false;
   int sim_control_rate_ = 50;
+  bool publish_tf_ = true;
 
   bool is_omni_ = false;
   std::shared_ptr<HunterRobot> robot_;
