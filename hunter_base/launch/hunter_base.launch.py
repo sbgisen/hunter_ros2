@@ -28,7 +28,9 @@ def generate_launch_description():
                                                    description='Whether running with simulator')
     sim_control_rate_arg = DeclareLaunchArgument('control_rate', default_value='50',
                                                  description='Simulation control loop update rate')
-    
+    publish_tf_arg = DeclareLaunchArgument('publish_tf', default_value='true',
+                                                description='Whether to publish odom->base_link TF')
+
     hunter_base_node = launch_ros.actions.Node(
         package='hunter_base',
         executable='hunter_base_node',
@@ -42,6 +44,7 @@ def generate_launch_description():
                 'odom_topic_name': launch.substitutions.LaunchConfiguration('odom_topic_name'),
                 'simulated_robot': launch.substitutions.LaunchConfiguration('simulated_robot'),
                 'control_rate': launch.substitutions.LaunchConfiguration('control_rate'),
+                'publish_tf': launch.substitutions.LaunchConfiguration('publish_tf'),
                 'robot_model': launch.substitutions.LaunchConfiguration('robot_model'),
         }])
 
@@ -53,6 +56,7 @@ def generate_launch_description():
         odom_topic_arg,
         simulated_robot_arg,
         sim_control_rate_arg,
+        publish_tf_arg,
         robot_model_arg,
         hunter_base_node
     ])

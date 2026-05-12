@@ -77,6 +77,7 @@ class HunterMessenger {
     simulated_robot_ = true;
     sim_control_rate_ = loop_rate;
   }
+  void SetPublishOdomTF(bool enable) { publish_tf_ = enable; }
 
   void SetupSubscription() {
     // odometry publisher
@@ -183,6 +184,7 @@ class HunterMessenger {
 
 
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+  bool publish_tf_ = true;
 
   // speed variables
   double position_x_ = 0.0;
@@ -293,7 +295,7 @@ class HunterMessenger {
     tf_msg.transform.translation.z = 0.0;
     tf_msg.transform.rotation = odom_quat;
 
-    tf_broadcaster_->sendTransform(tf_msg);
+    if (publish_tf_) tf_broadcaster_->sendTransform(tf_msg);
 
     // publish odometry and tf messages
     nav_msgs::msg::Odometry odom_msg;
