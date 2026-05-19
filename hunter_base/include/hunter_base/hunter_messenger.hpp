@@ -348,6 +348,8 @@ class HunterMessenger {
 
     double phi_i;
     phi_i = atan(l/(radius-w/2));
+    if(msg.linear.x<0)
+      phi_i *= -1.0;
     return k*phi_i;
   }
 };
