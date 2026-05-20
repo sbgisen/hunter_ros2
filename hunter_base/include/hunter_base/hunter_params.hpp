@@ -40,9 +40,9 @@ struct HunterSEParams {
   static constexpr double transmission_reduction_rate = 30;  // 1:30
 
   static constexpr double max_steer_angle =
-      0.283;  // for inner wheel
+      0.384;  // for inner wheel
   static constexpr double max_steer_angle_central =
-      0.384;  // max central angle
+      0.283;  // max central angle
   static constexpr double max_linear_speed = 1.5;  // in m/s
 };
 
