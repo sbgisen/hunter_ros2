@@ -340,7 +340,8 @@ class HunterMessenger {
     int k = msg.angular.z / fabs(msg.angular.z);
     if ((radius-l)<0 )
     {
-      return  k*max_steer_angle;
+      int reverse_sign = (msg.linear.x < 0) ? -1 : 1;
+      return reverse_sign * k * max_steer_angle;
     }
 
     double phi_i;
