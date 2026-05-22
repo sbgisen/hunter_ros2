@@ -37,7 +37,7 @@ struct HunterSEParams {
   static constexpr double wheelbase =
       0.55;  // in meter (front & rear wheel distance)
   static constexpr double wheel_radius = 0.1375;             // in meter
-  static constexpr double transmission_reduction_rate = 30;  // 1:30
+  static constexpr double transmission_reduction_rate = 4;  // 1:4
 
   static constexpr double max_steer_angle =
       0.283;  // in rad, 0.75 for inner wheel
