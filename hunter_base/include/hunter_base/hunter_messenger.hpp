@@ -290,14 +290,38 @@ class HunterMessenger {
     battery_msg.charge = nan;
     battery_msg.capacity = nan;
     battery_msg.design_capacity = nan;
-    battery_msg.power_supply_status =
-        sensor_msgs::msg::BatteryState::POWER_SUPPLY_STATUS_UNKNOWN;
+    // Estimate the charging state from the BMS current.
+    // AgileX current sign convention (confirmed on the actual robot):
+    //   positive -> charging, negative -> discharging.
+    using BatteryStateMsg = sensor_msgs::msg::BatteryState;
+    constexpr float current_deadband = 0.5F;  // [A] to avoid status flicker
+    if (bms.voltage <= 0.0F) {
+      // BMS basic frame not received (may be unavailable on the Hunter SE).
+      battery_msg.power_supply_status =
+          BatteryStateMsg::POWER_SUPPLY_STATUS_UNKNOWN;
+    } else if (bms.current < -current_deadband) {
+      // Negative current: discharging (e.g. driving).
+      battery_msg.power_supply_status =
+          BatteryStateMsg::POWER_SUPPLY_STATUS_DISCHARGING;
+    } else if (bms.current > current_deadband) {
+      // Positive current: charging. Report FULL once SOC reaches 90%.
+      battery_msg.power_supply_status =
+          (bms.battery_soc >= 90)
+              ? BatteryStateMsg::POWER_SUPPLY_STATUS_FULL
+              : BatteryStateMsg::POWER_SUPPLY_STATUS_CHARGING;
+    } else if (bms.battery_soc >= 90) {
+      // Idle current and SOC full -> fully charged.
+      battery_msg.power_supply_status =
+          BatteryStateMsg::POWER_SUPPLY_STATUS_FULL;
+    } else {
+      battery_msg.power_supply_status =
+          BatteryStateMsg::POWER_SUPPLY_STATUS_NOT_CHARGING;
+    }
     battery_msg.power_supply_health =
         sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_UNKNOWN;
     battery_msg.power_supply_technology =
         sensor_msgs::msg::BatteryState::POWER_SUPPLY_TECHNOLOGY_LION;
     battery_msg.present = true;
-    
     battery_state_pub_->publish(battery_msg);
   }
 
