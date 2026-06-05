@@ -13,10 +13,12 @@
 #include <string>
 #include <mutex>
 #include <memory>
+#include <limits>
 
 #include <rclcpp/rclcpp.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <geometry_msgs/msg/twist.hpp>
+#include <sensor_msgs/msg/battery_state.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
@@ -86,6 +88,9 @@ class HunterMessenger {
         node_->create_publisher<nav_msgs::msg::Odometry>(odom_topic_name_, 50);
     status_pub_ = node_->create_publisher<hunter_msgs::msg::HunterStatus>(
         "/hunter_status", 10);
+    battery_state_pub_ =
+        node_->create_publisher<sensor_msgs::msg::BatteryState>(
+            "/battery_state", 10);
 
     // cmd subscriber
     motion_cmd_sub_ = node_->create_subscription<geometry_msgs::msg::Twist>(
@@ -153,6 +158,9 @@ class HunterMessenger {
 
     status_pub_->publish(status_msg);
 
+    // publish battery state
+    PublishBatteryStateToROS(state.system_state);
+
     // publish odometry and tf
     PublishOdometryToROS(state.motion_state, dt);
 
@@ -179,6 +187,8 @@ class HunterMessenger {
 
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<hunter_msgs::msg::HunterStatus>::SharedPtr status_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::BatteryState>::SharedPtr
+      battery_state_pub_;
 
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr motion_cmd_sub_;
 
@@ -264,6 +274,58 @@ class HunterMessenger {
     tf2::Quaternion q;
     q.setRPY(0, 0, yaw);
     return tf2::toMsg(q);
+  }
+
+  void PublishBatteryStateToROS(const SystemStateMessage &system_state) {
+    // BMS basic frame may be absent on the Hunter SE (0 if not reported).
+    auto sensor_state = hunter_->GetCommonSensorState();
+    const auto &bms = sensor_state.bms_basic_state;
+
+    sensor_msgs::msg::BatteryState battery_msg;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    battery_msg.header.stamp = current_time_;
+    // Voltage is taken from the always-present system state frame; the BMS
+    // frame may be absent on the Hunter SE.
+    battery_msg.voltage = system_state.battery_voltage;
+    battery_msg.current = bms.current;
+    battery_msg.temperature = bms.temperature;
+    battery_msg.percentage = bms.battery_soc / 100.0f;  // SOC [%] -> [0,1]
+    battery_msg.charge = nan;
+    battery_msg.capacity = nan;
+    battery_msg.design_capacity = nan;
+    // Estimate the charging state from the BMS current.
+    // AgileX current sign convention (confirmed on the actual robot):
+    //   positive -> charging, negative -> discharging.
+    using BatteryStateMsg = sensor_msgs::msg::BatteryState;
+    constexpr float current_deadband = 0.5F;  // [A] to avoid status flicker
+    if (bms.voltage <= 0.0F) {
+      // BMS basic frame not received (may be unavailable on the Hunter SE).
+      battery_msg.power_supply_status =
+          BatteryStateMsg::POWER_SUPPLY_STATUS_UNKNOWN;
+    } else if (bms.current < -current_deadband) {
+      // Negative current: discharging (e.g. driving).
+      battery_msg.power_supply_status =
+          BatteryStateMsg::POWER_SUPPLY_STATUS_DISCHARGING;
+    } else if (bms.current > current_deadband) {
+      // Positive current: charging. Report FULL once SOC reaches 90%.
+      battery_msg.power_supply_status =
+          (bms.battery_soc >= 90)
+              ? BatteryStateMsg::POWER_SUPPLY_STATUS_FULL
+              : BatteryStateMsg::POWER_SUPPLY_STATUS_CHARGING;
+    } else if (bms.battery_soc >= 90) {
+      // Idle current and SOC full -> fully charged.
+      battery_msg.power_supply_status =
+          BatteryStateMsg::POWER_SUPPLY_STATUS_FULL;
+    } else {
+      battery_msg.power_supply_status =
+          BatteryStateMsg::POWER_SUPPLY_STATUS_NOT_CHARGING;
+    }
+    battery_msg.power_supply_health =
+        sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_UNKNOWN;
+    battery_msg.power_supply_technology =
+        sensor_msgs::msg::BatteryState::POWER_SUPPLY_TECHNOLOGY_LION;
+    battery_msg.present = true;
+    battery_state_pub_->publish(battery_msg);
   }
 
   void PublishOdometryToROS(const MotionStateMessage &msg, double dt) {
